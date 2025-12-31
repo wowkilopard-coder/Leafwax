@@ -1,4 +1,4 @@
-local CurrentVersion = "Leafwax 🍃 -- Version 1.02"
+local CurrentVersion = "Leafwax 🍃 -- Version 1.03"
 print(CurrentVersion)
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
