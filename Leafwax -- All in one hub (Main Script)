@@ -417,6 +417,100 @@ local Egor = Tab3:CreateButton({
 	end,
 })
 
+local OtherTab = Window:CreateTab("Other")
+
+-- Esp
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local espEnabled = false
+local connections = {}
+
+local function createESP(player)
+	if player == Players.LocalPlayer then return end
+	if not player.Character then return end
+	if not player.Character:FindFirstChild("HumanoidRootPart") then return end
+	if player.Character:FindFirstChild("ESP_Highlight") then return end
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "ESP_Highlight"
+	highlight.FillTransparency = 1
+	highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+	highlight.Parent = player.Character
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "ESP_Billboard"
+	billboard.Size = UDim2.new(0, 200, 0, 50)
+	billboard.StudsOffset = Vector3.new(0, 3, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Parent = player.Character.HumanoidRootPart
+
+	local text = Instance.new("TextLabel")
+	text.Size = UDim2.new(1, 0, 1, 0)
+	text.BackgroundTransparency = 1
+	text.Text = player.Name
+	text.TextColor3 = Color3.fromRGB(255, 0, 0)
+	text.TextStrokeTransparency = 0
+	text.TextScaled = true
+	text.Font = Enum.Font.SourceSansBold
+	text.Parent = billboard
+end
+
+local function removeESP(player)
+	if player.Character then
+		if player.Character:FindFirstChild("ESP_Highlight") then
+			player.Character.ESP_Highlight:Destroy()
+		end
+		if player.Character:FindFirstChild("HumanoidRootPart") then
+			local hrp = player.Character.HumanoidRootPart
+			if hrp:FindFirstChild("ESP_Billboard") then
+				hrp.ESP_Billboard:Destroy()
+			end
+		end
+	end
+end
+
+local function enableESP()
+	connections.loop = RunService.Heartbeat:Connect(function()
+		for _, player in pairs(Players:GetPlayers()) do
+			createESP(player)
+		end
+	end)
+
+	connections.added = Players.PlayerAdded:Connect(function(player)
+		player.CharacterAdded:Connect(function()
+			task.wait(1)
+			if espEnabled then
+				createESP(player)
+			end
+		end)
+	end)
+end
+
+local function disableESP()
+	for _, player in pairs(Players:GetPlayers()) do
+		removeESP(player)
+	end
+	for _, con in pairs(connections) do
+		con:Disconnect()
+	end
+	connections = {}
+end
+
+local Toggle = OtherTab:CreateToggle({
+	Name = "Player Esp",
+	CurrentValue = false,
+	Flag = "Toggle1",
+	Callback = function(Value)
+		espEnabled = Value
+		if Value then
+			enableESP()
+		else
+			disableESP()
+		end
+	end,
+})
+--Esp Ends here
+
 local Tab4 = Window:CreateTab("Games 🎮")
 
 local HubsSection = Tab4:CreateSection("Hubs")
@@ -425,6 +519,13 @@ local XVCHub = Tab4:CreateButton({
 	Callback = function()
 		-- The function that takes place when the button is pressed
 		loadstring(game:HttpGet("https://pastebin.com/raw/Piw5bqGq"))()
+	end,
+})
+local Z3us = Tab4:CreateButton({
+	Name = "Load Z3us (Scripts for roblox gun games like Rivals, Hypershot, Arsenal...)",
+	Callback = function()
+		-- The function that takes place when the button is pressed
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/blackowl1231/Z3US/refs/heads/main/main.lua"))()
 	end,
 })
 
