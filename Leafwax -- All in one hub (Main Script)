@@ -1,4 +1,4 @@
-local CurrentVersion = "Leafwax 🍃 -- Version 1.03"
+local CurrentVersion = "Leafwax 🍃 -- Version 1.04"
 print(CurrentVersion)
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -74,6 +74,26 @@ local GodMode = Tab:CreateButton({
 
 local CurrentSpeed = 16
 local SpeedLoopRunning = false
+local ToggleOn = false
+local DefaultSpeed = 16
+
+local function startSpeedLoop()
+	if SpeedLoopRunning then return end
+	SpeedLoopRunning = true
+	task.spawn(function()
+		while SpeedLoopRunning and ToggleOn do
+			local player = game.Players.LocalPlayer
+			local char = player and player.Character
+			local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				humanoid.WalkSpeed = CurrentSpeed
+			end
+			task.wait(0.1)
+		end
+		SpeedLoopRunning = false
+	end)
+end
+
 local SpeedSlider = Tab:CreateSlider({
 	Name = "Speed",
 	Range = {0, 500},
@@ -83,17 +103,26 @@ local SpeedSlider = Tab:CreateSlider({
 	Flag = "SpeedSlider",
 	Callback = function(Value)
 		CurrentSpeed = Value
-		if not SpeedLoopRunning then
-			SpeedLoopRunning = true
-			task.spawn(function()
-				while SpeedLoopRunning do
-					local player = game.Players.LocalPlayer
-					if player and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
-						player.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = CurrentSpeed
-					end
-					task.wait(0.2)
-				end
-			end)
+		if ToggleOn then
+			startSpeedLoop()
+		end
+	end,
+})
+
+local SpeedToggle = Tab:CreateToggle({
+	Name = "Enable Walkspeed",
+	CurrentValue = false,
+	Flag = "Toggle1",
+	Callback = function(Value)
+		ToggleOn = Value
+		if Value then
+			startSpeedLoop()
+		else
+			SpeedLoopRunning = false
+			local player = game.Players.LocalPlayer
+			if player and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+				player.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = DefaultSpeed
+			end
 		end
 	end,
 })
@@ -101,26 +130,55 @@ local SpeedSlider = Tab:CreateSlider({
 
 local CurrentJump = 50
 local JumpLoopRunning = false
+local JumpToggleOn = false
+local DefaultJump = 50
+
+local function startJumpLoop()
+	if JumpLoopRunning then return end
+	JumpLoopRunning = true
+	task.spawn(function()
+		while JumpLoopRunning and JumpToggleOn do
+			local player = game.Players.LocalPlayer
+			local char = player and player.Character
+			local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				humanoid.JumpPower = CurrentJump
+			end
+			task.wait(0.1)
+		end
+		JumpLoopRunning = false
+	end)
+end
+
 local JumpSlider = Tab:CreateSlider({
 	Name = "JumpPower",
 	Range = {0, 500},
 	Increment = 1,
-	Suffix = "JumpPower",
+	Suffix = "Jump",
 	CurrentValue = CurrentJump,
 	Flag = "JumpSlider",
 	Callback = function(Value)
 		CurrentJump = Value
-		if not JumpLoopRunning then
-			JumpLoopRunning = true
-			task.spawn(function()
-				while JumpLoopRunning do
-					local player = game.Players.LocalPlayer
-					if player and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
-						player.Character:FindFirstChildOfClass("Humanoid").JumpPower = CurrentJump
-					end
-					task.wait(0.2)
-				end
-			end)
+		if JumpToggleOn then
+			startJumpLoop()
+		end
+	end,
+})
+
+local JumpToggle = Tab:CreateToggle({
+	Name = "Jump Toggle",
+	CurrentValue = false,
+	Flag = "JumpToggle",
+	Callback = function(Value)
+		JumpToggleOn = Value
+		if Value then
+			startJumpLoop()
+		else
+			JumpLoopRunning = false
+			local player = game.Players.LocalPlayer
+			if player and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+				player.Character:FindFirstChildOfClass("Humanoid").JumpPower = DefaultJump
+			end
 		end
 	end,
 })
