@@ -1,4 +1,4 @@
-local CurrentVersion = "Leafwax 🍃 -- Version 1.08"
+local CurrentVersion = "Leafwax 🍃 -- Version 1.09"
 print(CurrentVersion)
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -571,12 +571,11 @@ local function getPlayerNames()
 	return t
 end
 
-local initialOptions = getPlayerNames()
-
+-- Alkuperäinen dropdown
 local PlayersDropdown = Tracking:CreateDropdown({
 	Name = "Players",
-	Options = initialOptions,
-	CurrentOption = {initialOptions[1]},
+	Options = getPlayerNames(),
+	CurrentOption = {getPlayerNames()[1]},
 	MultipleOptions = false,
 	Flag = "DropdownPlayers",
 	Callback = function(Options)
@@ -584,29 +583,23 @@ local PlayersDropdown = Tracking:CreateDropdown({
 	end,
 })
 
+-- Refresh nappi päivittää dropdownin olemassa oleviin vaihtoehtoihin
 local RefreshButton = Tracking:CreateButton({
 	Name = "Refresh",
 	Callback = function()
 		local opts = getPlayerNames()
 		if PlayersDropdown and PlayersDropdown.SetOptions then
 			PlayersDropdown:SetOptions(opts)
+			-- Asetetaan ensimmäinen vaihtoehto valituksi
+			selectedPlayerName = opts[1]
 		elseif PlayersDropdown and PlayersDropdown.Update then
 			PlayersDropdown:Update({Options = opts, CurrentOption = {opts[1]}})
-		else
-			PlayersDropdown = Tracking:CreateDropdown({
-				Name = "Players",
-				Options = opts,
-				CurrentOption = {opts[1]},
-				MultipleOptions = false,
-				Flag = "DropdownPlayers",
-				Callback = function(Options)
-					selectedPlayerName = Options[1]
-				end,
-			})
+			selectedPlayerName = opts[1]
 		end
 	end,
 })
 
+-- Teleport nappi
 local TeleportToPlayerButton = Tracking:CreateButton({
 	Name = "Teleport",
 	Callback = function()
@@ -630,7 +623,6 @@ local TeleportToPlayerButton = Tracking:CreateButton({
 		hrp.CFrame = thrp.CFrame + Vector3.new(0, 3, 0)
 	end,
 })
-
 -- TeleportEndsHere
 
 local Tab4 = Window:CreateTab("Games 🎮")
