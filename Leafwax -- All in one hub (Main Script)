@@ -1,4 +1,4 @@
-local CurrentVersion = "Leafwax 🍃 -- Version 1.04"
+local CurrentVersion = "Leafwax 🍃 -- Version 1.05"
 print(CurrentVersion)
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -71,7 +71,7 @@ local GodMode = Tab:CreateButton({
 	end,
 })
 
-
+-- Speed
 local CurrentSpeed = 16
 local SpeedLoopRunning = false
 local ToggleOn = false
@@ -127,7 +127,7 @@ local SpeedToggle = Tab:CreateToggle({
 	end,
 })
 
-
+-- Jump
 local CurrentJump = 50
 local JumpLoopRunning = false
 local JumpToggleOn = false
@@ -150,6 +150,7 @@ local function startJumpLoop()
 	end)
 end
 
+
 local JumpSlider = Tab:CreateSlider({
 	Name = "JumpPower",
 	Range = {0, 500},
@@ -166,9 +167,9 @@ local JumpSlider = Tab:CreateSlider({
 })
 
 local JumpToggle = Tab:CreateToggle({
-	Name = "Jump Toggle",
+	Name = "Enable JumpPower",
 	CurrentValue = false,
-	Flag = "JumpToggle",
+	Flag = "Toggle1",
 	Callback = function(Value)
 		JumpToggleOn = Value
 		if Value then
@@ -185,48 +186,69 @@ local JumpToggle = Tab:CreateToggle({
 
 
 -- No Clip
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Plr = Players.LocalPlayer
+
+local SteppedConnection = nil
+local CharacterAddedConnection = nil
+local ClipOn = false
+
+local function setCharacterCollision(state)
+	local char = Plr and Plr.Character
+	if not char then return end
+	for _, v in ipairs(char:GetDescendants()) do
+		if v:IsA("BasePart") then
+			v.CanCollide = state
+		end
+	end
+end
+
+local function startNoClip()
+	if SteppedConnection then return end
+	setCharacterCollision(false)
+	SteppedConnection = RunService.Stepped:Connect(function()
+		local char = Plr and Plr.Character
+		if not char then return end
+		for _, part in ipairs(char:GetDescendants()) do
+			if part:IsA("BasePart") then
+				part.CanCollide = false
+			end
+		end
+	end)
+	CharacterAddedConnection = Plr.CharacterAdded:Connect(function()
+		task.wait(0.1)
+		setCharacterCollision(false)
+	end)
+end
+
+local function stopNoClip()
+	if SteppedConnection then
+		SteppedConnection:Disconnect()
+		SteppedConnection = nil
+	end
+	if CharacterAddedConnection then
+		CharacterAddedConnection:Disconnect()
+		CharacterAddedConnection = nil
+	end
+	setCharacterCollision(true)
+end
+
 local NoClip = Tab:CreateToggle({
 	Name = "No Clip",
 	CurrentValue = false,
 	Flag = "NoClip",
-	Callback = (function()
-		local Players = game:GetService("Players")
-		local RunService = game:GetService("RunService")
-		local Plr = Players.LocalPlayer
-		local SteppedConnection = nil
-		local Clipon = false
-
-		return function(Value)
-			Clipon = Value
-
-			if Clipon then
-				if SteppedConnection then
-					SteppedConnection:Disconnect()
-					SteppedConnection = nil
-				end
-
-				SteppedConnection = RunService.Stepped:Connect(function()
-					for _, b in pairs(workspace:GetChildren()) do
-						if b.Name == Plr.Name then
-							for _, v in pairs(b:GetChildren()) do
-								if v:IsA("BasePart") then
-									v.CanCollide = false
-								end
-							end
-						end
-					end
-				end)
-
-			else
-				if SteppedConnection then
-					SteppedConnection:Disconnect()
-					SteppedConnection = nil
-				end
-			end
+	Callback = function(Value)
+		ClipOn = Value
+		if ClipOn then
+			startNoClip()
+		else
+			stopNoClip()
 		end
-	end)(),
+	end,
 })
 
+-- Rootpart Anchor
 local RootPartAnchor = Tab:CreateToggle({
 	Name = "Anchor HumanoidRootPart",
 	CurrentValue = false,
@@ -370,10 +392,10 @@ local AutoPiano = Tab2:CreateButton({
 
 local Tab3 = Window:CreateTab("Troll 🤡")
 
+-- Chat Bypass
 local ChatBypassSection = Tab3:CreateSection("Chat Bypass")
-
 local ChatBypass = Tab3:CreateButton({
-	Name = "Load Vadrifts chat bypass",
+	Name = "Load Vadrifts chat bypass (Sadly needs key)",
 	Callback = function()
 		-- The function that takes place when the button is pressed
 		loadstring(game:HttpGet("https://raw.githubusercontent.com/vqmpjay/Vadrifts/refs/heads/main/VadriftsBypasser.lua"))()
@@ -386,46 +408,6 @@ local ChatBypass = Tab3:CreateButton({
 	end,
 })
 
-local ChatBypassWeeklyKey = Tab3:CreateButton({
-	Name = "Copy chatbypass weekly key",
-	Callback = function()
-		-- The function that takes place when the button is pressed
-		local text = "jayhot"
-
-		if type(syn) == "table" and syn.set_clipboard then
-			syn.set_clipboard(text)
-			Rayfield:Notify({
-				Title = "Successfully copied",
-				Content = "Chatbypass key is copied to your clipboard",
-				Duration = 6.5,
-				Image = 0,
-			})
-		elseif type(setclipboard) == "function" then
-			setclipboard(text)
-			Rayfield:Notify({
-				Title = "Successfully copied",
-				Content = "Chatbypass key is copied to your clipboard",
-				Duration = 6.5,
-				Image = 0,
-			})
-		elseif type(write_clipboard) == "function" then
-			write_clipboard(text)
-			Rayfield:Notify({
-				Title = "Successfully copied",
-				Content = "Chatbypass key is copied to your clipboard",
-				Duration = 6.5,
-				Image = 0,
-			})
-		else
-			Rayfield:Notify({
-				Title = "Failed to copy",
-				Content = "Your executor doesn't support setclipboard/syn.set_clipboard funktion",
-				Duration = 6.5,
-				Image = 0,
-			})
-		end
-	end,
-})
 
 local Weird3 = Tab3:CreateSection("18+ Section")
 
@@ -475,7 +457,9 @@ local Egor = Tab3:CreateButton({
 	end,
 })
 
-local OtherTab = Window:CreateTab("Other")
+
+-- Tracking Tab
+local Tracking = Window:CreateTab("Tracking")
 
 -- Esp
 local Players = game:GetService("Players")
@@ -554,7 +538,7 @@ local function disableESP()
 	connections = {}
 end
 
-local Toggle = OtherTab:CreateToggle({
+local Toggle = Tracking:CreateToggle({
 	Name = "Player Esp",
 	CurrentValue = false,
 	Flag = "Toggle1",
@@ -568,6 +552,115 @@ local Toggle = OtherTab:CreateToggle({
 	end,
 })
 --Esp Ends here
+
+-- Teleport
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local function playerNames()
+	local t = {}
+	for _, p in pairs(Players:GetPlayers()) do
+		if p ~= LocalPlayer then
+			table.insert(t, p.Name)
+		end
+	end
+	if #t == 0 then
+		table.insert(t, "No players")
+	end
+	return t
+end
+
+local selectedName
+
+local function setDropdownOptions(dropdown, options)
+	if type(dropdown.SetOptions) == "function" then
+		dropdown:SetOptions(options)
+		return dropdown
+	end
+	if type(dropdown.Update) == "function" then
+		dropdown:Update(options)
+		return dropdown
+	end
+	if type(dropdown.Refresh) == "function" then
+		dropdown:Refresh(options)
+		return dropdown
+	end
+	if type(dropdown.Set) == "function" then
+		dropdown:Set(options)
+		return dropdown
+	end
+	local newDropdown = Tracking:CreateDropdown({
+		Name = dropdown.Name or "Players",
+		Options = options,
+		CurrentOption = options[1] and {options[1]} or {},
+		MultipleOptions = false,
+		Flag = (dropdown.Flag or "Dropdown1") .. "_players",
+		Callback = function(opts)
+			selectedName = opts[1]
+		end,
+	})
+	return newDropdown
+end
+
+Dropdown.Callback = function(opts)
+	selectedName = opts[1]
+end
+
+local function refresh()
+	local opts = playerNames()
+	Dropdown = setDropdownOptions(Dropdown, opts)
+	if not selectedName or not table.find(opts, selectedName) then
+		selectedName = (opts[1] ~= "No players") and opts[1] or nil
+	end
+end
+
+Players.PlayerAdded:Connect(refresh)
+Players.PlayerRemoving:Connect(refresh)
+refresh()
+
+Button.Callback = function()
+	if not selectedName then
+		Rayfield:Notify({
+			Title = "Teleport Error",
+			Content = "No player selected.",
+			Duration = 6.5,
+			Image = 4483362458,
+		})
+		return
+	end
+	local target = Players:FindFirstChild(selectedName)
+	if not target or not target.Character or not target.Character.PrimaryPart then
+		Rayfield:Notify({
+			Title = "Teleport Error",
+			Content = "Target player's character is not available.",
+			Duration = 6.5,
+			Image = 4483362458,
+		})
+		return
+	end
+	local myChar = LocalPlayer.Character
+	if not myChar or not myChar.PrimaryPart then
+		Rayfield:Notify({
+			Title = "Teleport Error",
+			Content = "Your character is not available.",
+			Duration = 6.5,
+			Image = 4483362458,
+		})
+		return
+	end
+	local ok, err = pcall(function()
+		myChar:SetPrimaryPartCFrame(target.Character.PrimaryPart.CFrame * CFrame.new(2, 0, 0))
+	end)
+	if not ok then
+		Rayfield:Notify({
+			Title = "Teleport Error",
+			Content = "Teleport failed: "..tostring(err),
+			Duration = 6.5,
+			Image = 4483362458,
+		})
+	end
+end
+-- TeleportEndsHere
 
 local Tab4 = Window:CreateTab("Games 🎮")
 
