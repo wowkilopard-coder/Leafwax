@@ -1,4 +1,4 @@
-local CurrentVersion = "Leafwax 🍃 -- Version 1.06"
+local CurrentVersion = "Leafwax 🍃 -- Version 1.07"
 print(CurrentVersion)
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -555,54 +555,61 @@ local Toggle = Tracking:CreateToggle({
 
 -- Teleport
 local Players = game:GetService("Players")
-local localPlayer = Players.LocalPlayer
-local Tracking = Tracking -- oletetaan että Tracking on jo määritelty Rayfieldissä
+local lp = Players.LocalPlayer
+local Tracking = Tracking
+
 local selected
-
-local function getNames()
-	local t = {}
-	for _,p in pairs(Players:GetPlayers()) do
-		if p ~= localPlayer then table.insert(t, p.Name) end
-	end
-	table.sort(t)
-	return t
-end
-
-local PlayersDropdown
-local function makeDropdown()
-	local names = getNames()
-	if PlayersDropdown and PlayersDropdown.Refresh then
-		pcall(function() PlayersDropdown:Refresh(names) end)
-	else
-		PlayersDropdown = Tracking:CreateDropdown({
-			Name = "Players",
-			Options = names,
-			CurrentOption = (names[1] and {names[1]} or {}),
-			MultipleOptions = false,
-			Flag = "PlayersDropdownFlag",
-			Callback = function(opt) selected = opt[1] end,
-		})
-		selected = PlayersDropdown.CurrentOption and PlayersDropdown.CurrentOption[1]
-	end
-end
-
-local Teleport = Tracking:CreateButton({
-	Name = "Teleport",
-	Callback = function()
-		if not selected then return end
-		local target = Players:FindFirstChild(selected)
-		if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then return end
-		local myHRP = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
-		if myHRP then myHRP.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,3) end
-	end,
+local dropdown = Tracking:CreateDropdown({
+	Name = "Players",
+	Options = {},
+	CurrentOption = {},
+	MultipleOptions = false,
+	Flag = "PlayersDropdownFlag",
+	Callback = function(opt) selected = opt[1] end,
 })
 
-makeDropdown()
-Players.PlayerAdded:Connect(makeDropdown)
-Players.PlayerRemoving:Connect(function(p)
-	if selected == p.Name then selected = nil end
-	makeDropdown()
-end)
+local teleportBtn
+
+local function createTeleportButton()
+	if teleportBtn then return end
+	teleportBtn = Tracking:CreateButton({
+		Name = "Teleport",
+		Callback = function()
+			if not selected then return end
+			local target = Players:FindFirstChild(selected)
+			if not target or not target.Character then return end
+			local targetHRP = target.Character:FindFirstChild("HumanoidRootPart")
+			local myHRP = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+			if targetHRP and myHRP then
+				myHRP.CFrame = targetHRP.CFrame * CFrame.new(0,0,3)
+			end
+		end,
+	})
+end
+
+Tracking:CreateButton({
+	Name = "Refresh",
+	Callback = function()
+		local names = {}
+		for _,p in pairs(Players:GetPlayers()) do
+			if p ~= lp then table.insert(names, p.Name) end
+		end
+		table.sort(names)
+		local ok = pcall(function() dropdown:Refresh(names) end)
+		if not ok then
+			dropdown = Tracking:CreateDropdown({
+				Name = "Players",
+				Options = names,
+				CurrentOption = (names[1] and {names[1]} or {}),
+				MultipleOptions = false,
+				Flag = "PlayersDropdownFlag",
+				Callback = function(opt) selected = opt[1] end,
+			})
+			selected = dropdown.CurrentOption and dropdown.CurrentOption[1] or nil
+		end
+		createTeleportButton()
+	end,
+})
 -- TeleportEndsHere
 
 local Tab4 = Window:CreateTab("Games 🎮")
