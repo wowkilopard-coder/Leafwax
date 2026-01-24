@@ -1,0 +1,112 @@
+local player = game.Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local rootPart = char:WaitForChild("HumanoidRootPart")
+
+local touchPart = workspace.Worlds.World2.Zones["Wins giver"]["WinPart Z11"].Touch
+touchPart.Transparency = 1
+touchPart.CanCollide = false
+
+local enabled = false
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "ToggleGui"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 170, 0, 70)
+main.Position = UDim2.new(0, 40, 0, 200)
+main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+main.BorderSizePixel = 0
+main.Parent = gui
+
+local topbar = Instance.new("Frame")
+topbar.Size = UDim2.new(1, 0, 0, 18)
+topbar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+topbar.BorderSizePixel = 0
+topbar.Parent = main
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 1, 0)
+title.BackgroundTransparency = 1
+title.Text = "Wins Giver"
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Parent = topbar
+
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(1, -10, 1, -28)
+button.Position = UDim2.new(0, 5, 0, 23)
+button.BackgroundColor3 = Color3.fromRGB(170, 50, 50)
+button.BorderSizePixel = 0
+button.TextScaled = true
+button.Font = Enum.Font.GothamBold
+button.TextColor3 = Color3.fromRGB(255, 255, 255)
+button.Text = "OFF"
+button.Parent = main
+
+local function updateUI()
+	if enabled then
+		button.Text = "ON"
+		button.BackgroundColor3 = Color3.fromRGB(40, 170, 70)
+	else
+		button.Text = "OFF"
+		button.BackgroundColor3 = Color3.fromRGB(170, 50, 50)
+	end
+end
+
+local dragging = false
+local dragStart
+local startPos
+
+topbar.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = main.Position
+
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+topbar.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		if dragging then
+			local delta = input.Position - dragStart
+			main.Position = UDim2.new(
+				startPos.X.Scale, startPos.X.Offset + delta.X,
+				startPos.Y.Scale, startPos.Y.Offset + delta.Y
+			)
+		end
+	end
+end)
+
+button.MouseButton1Click:Connect(function()
+	enabled = not enabled
+	updateUI()
+end)
+
+updateUI()
+
+task.spawn(function()
+	while true do
+		if enabled then
+			if rootPart and rootPart.Parent then
+				touchPart.CFrame = rootPart.CFrame
+				task.wait(0.1)
+				touchPart.CFrame = rootPart.CFrame * CFrame.new(0, -2, 0)
+			end
+		end
+		task.wait(0.05)
+	end
+end)
+
+player.CharacterAdded:Connect(function(newChar)
+	char = newChar
+	rootPart = newChar:WaitForChild("HumanoidRootPart")
+end)
