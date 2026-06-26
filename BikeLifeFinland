@@ -1,0 +1,294 @@
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+
+local Window = Fluent:CreateWindow({
+	Title = "Bikelife Finland " .. Fluent.Version,
+	SubTitle = "by kilopard",
+	TabWidth = 160,
+	Size = UDim2.fromOffset(580, 460),
+	Acrylic = true, -- The blur may be detectable, setting this to false disables blur entirely
+	Theme = "Aqua",
+	MinimizeKey = Enum.KeyCode.RightShift -- Used when theres no MinimizeKeybind
+})
+
+-- Fluent provides Lucide Icons, they are optional
+local Tabs = {
+	Autofarm = Window:AddTab({ Title = "Auto Farm", Icon = "" }),
+	VehicleMods = Window:AddTab({ Title = "Vehicle Mods", Icon = "" }),
+}
+
+local SPEED = 400
+local FIXED_Y = 3.5
+
+Tabs.Autofarm:AddButton({
+	Title = "Start autofarm",
+	Description = "Sit on vehicle before pressing. To stop autofarm just respawn your vehicle",
+	Callback = function()
+
+		local RunService = game:GetService("RunService")
+		
+		local player = game.Players.LocalPlayer
+		local car = workspace[player.Name .. "sCar"]
+
+		local WHEELIE_ANGLE = math.rad(25)
+
+		local A = Vector3.new(344, FIXED_Y, 2533)
+		local B = Vector3.new(343, FIXED_Y, -6961)
+
+		local dirAB = (Vector3.new(B.X, 0, B.Z) - Vector3.new(A.X, 0, A.Z)).Unit
+		local dirBA = -dirAB
+		local yawAB = math.atan2(-dirAB.X, -dirAB.Z)
+		local yawBA = math.atan2(-dirBA.X, -dirBA.Z)
+
+		local currentPos = Vector3.new(A.X, FIXED_Y, A.Z)
+		local currentDir = dirAB
+		local currentYaw = yawAB
+		local target = B
+
+		RunService.Heartbeat:Connect(function(dt)
+			local toTarget = Vector3.new(target.X - currentPos.X, 0, target.Z - currentPos.Z)
+
+			if toTarget.Magnitude < SPEED * dt + 1 then
+				if target == B then
+					target = A
+					currentDir = dirBA
+					currentYaw = yawBA
+				else
+					target = B
+					currentDir = dirAB
+					currentYaw = yawAB
+				end
+				return
+			end
+
+			currentPos = currentPos + currentDir * SPEED * dt
+
+			car:PivotTo(
+				CFrame.new(currentPos)
+					* CFrame.Angles(0, currentYaw, 0)
+					* CFrame.Angles(WHEELIE_ANGLE, 0, 0)
+			)
+		end)
+	end
+})
+
+local FarmSpeed = Tabs.Autofarm:AddSlider("Speed", 
+	{
+		Title = "Speed",
+		Description = "Change vehicle speed in autofarm (Recommended speed is about 400)",
+		Default = 400,
+		Min = 40,
+		Max = 2000,
+		Rounding = 1,
+		Callback = function(Value)
+			SPEED = Value
+		end
+	})
+
+local VehicleHeight = Tabs.Autofarm:AddSlider("VehicleHeight", 
+	{
+		Title = "VehcileHeight",
+		Description = "Change the height of your vehicle in autofarm (Recommended height is around 3.5 depending on the vehicle)",
+		Default = 3.5,
+		Min = 1.5,
+		Max = 5,
+		Rounding = 1,
+		Callback = function(Value)
+			FIXED_Y = Value
+		end
+	})
+
+-- Here starts Tab 2
+local CustomSpeedEnabled = false
+local CustomSpeedToggle = Tabs.VehicleMods:AddToggle("CustomSpeedToggle", 
+	{
+		Title = "Custom Speed Toggle", 
+		Description = "Change your vehicle's speed",
+		Default = false,
+		Callback = function(state)
+			CustomSpeedEnabled = state
+		end 
+	})
+
+local MAX_SPEED_KMH = 150
+local MaxSpeedSlider = Tabs.VehicleMods:AddSlider("MaxSpeedSlider", 
+	{
+		Title = "Max Speed",
+		Description = "Change the max speed of your vehicle",
+		Default = 150,
+		Min = 20,
+		Max = 500,
+		Rounding = 1,
+		Callback = function(Value)
+			MAX_SPEED_KMH = Value
+		end
+	})
+
+local ACCEL = 20
+local AccelerationSlider = Tabs.VehicleMods:AddSlider("AccelerationSlider", 
+	{
+		Title = "Acceleration",
+		Description = "Changes how fast your vehicle accelerates to the max speed (Higher number is faster)",
+		Default = 20,
+		Min = 1,
+		Max = 1000,
+		Rounding = 1,
+		Callback = function(Value)
+			ACCEL = Value
+		end
+	})
+
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local player = game.Players.LocalPlayer
+
+local REVERSE_KMH = 20
+local DECEL = 30
+local TURN_SPEED = 1.5
+local KMH_TO_STUDS = (1 / 3.6 * 5.6) / 1.42
+
+local bv = nil
+local bav = nil
+local speed = 0
+local lastDrag = nil
+
+local function setupForces(drag)
+	-- Poista vanhat
+	if bv then bv:Destroy() end
+	if bav then bav:Destroy() end
+
+	bv = Instance.new("BodyVelocity")
+	bv.MaxForce = Vector3.new(9999999, 0, 9999999)
+	bv.P = 2000
+	bv.Velocity = Vector3.new(0, 0, 0)
+	bv.Parent = drag
+
+	bav = Instance.new("BodyAngularVelocity")
+	bav.MaxTorque = Vector3.new(0, 9999999, 0)
+	bav.AngularVelocity = Vector3.new(0, 0, 0)
+	bav.P = 9999999
+	bav.Parent = drag
+
+	lastDrag = drag
+end
+
+RunService.Heartbeat:Connect(function(dt)
+	if not CustomSpeedEnabled then
+		if bv then bv.Velocity = Vector3.new(0, 0, 0) end
+		if bav then bav.AngularVelocity = Vector3.new(0, 0, 0) end
+		speed = 0
+		return
+	end
+
+	-- Hae drag joka frame uudestaan jos vaihdettu
+	local ok, car = pcall(function()
+		return workspace[player.Name .. "sCar"]
+	end)
+	if not ok or not car then return end
+
+	local ok2, drag = pcall(function()
+		return car.Body.Drag
+	end)
+	if not ok2 or not drag then return end
+
+	-- Resetoi forces jos drag vaihtui
+	if drag ~= lastDrag then
+		speed = 0
+		setupForces(drag)
+	end
+
+	-- Laske arvot slidereiden mukaan joka frame
+	local maxSpeed     = MAX_SPEED_KMH * KMH_TO_STUDS
+	local reverseSpeed = REVERSE_KMH   * KMH_TO_STUDS
+	local accelS       = ACCEL         * KMH_TO_STUDS
+	local decelS       = DECEL         * KMH_TO_STUDS
+
+	local flatLook = Vector3.new(drag.CFrame.LookVector.X, 0, drag.CFrame.LookVector.Z).Unit
+
+	if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then
+		speed = math.min(speed + accelS * dt, maxSpeed)
+	elseif UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down) then
+		speed = math.max(speed - accelS * dt, -reverseSpeed)
+	else
+		if speed > 0 then
+			speed = math.max(speed - decelS * dt, 0)
+		elseif speed < 0 then
+			speed = math.min(speed + decelS * dt, 0)
+		end
+	end
+
+	bv.Velocity = flatLook * speed
+
+	local speedFactor = math.abs(speed) / maxSpeed
+	if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then
+		bav.AngularVelocity = Vector3.new(0, TURN_SPEED * speedFactor, 0)
+	elseif UserInputService:IsKeyDown(Enum.KeyCode.D) or UserInputService:IsKeyDown(Enum.KeyCode.Right) then
+		bav.AngularVelocity = Vector3.new(0, -TURN_SPEED * speedFactor, 0)
+	else
+		bav.AngularVelocity = Vector3.new(0, 0, 0)
+	end
+end)
+
+local WheelieEnabled = false
+local WheelieToggle = Tabs.VehicleMods:AddToggle("Wheelie", 
+	{
+		Title = "Wheelie", 
+		Description = "Infinite Wheelie",
+		Default = false,
+		Callback = function(state)
+			WheelieEnabled = state
+		end 
+	})
+
+local RunService = game:GetService("RunService")
+local player = game.Players.LocalPlayer
+
+local WHEELIE_ANGLE = math.rad(25)
+
+local gyro = nil
+local lastDrag = nil
+
+local function setupGyro(drag)
+	if gyro then gyro:Destroy() end
+
+	gyro = Instance.new("BodyGyro")
+	gyro.MaxTorque = Vector3.new(9999999, 0, 9999999)
+	gyro.P = 50000
+	gyro.D = 2000
+	gyro.CFrame = drag.CFrame
+	gyro.Parent = drag
+
+	lastDrag = drag
+end
+
+RunService.Heartbeat:Connect(function()
+	-- Hae drag
+	local ok, car = pcall(function() return workspace[player.Name .. "sCar"] end)
+	if not ok or not car then return end
+	local ok2, drag = pcall(function() return car.Body.Drag end)
+	if not ok2 or not drag then return end
+
+	if drag ~= lastDrag then
+		setupGyro(drag)
+	end
+
+	if not WheelieEnabled then
+		if gyro then gyro:Destroy() gyro = nil lastDrag = nil end
+		return
+	end
+
+	if not gyro then setupGyro(drag) end
+
+	local look = drag.CFrame.LookVector
+	local yaw = math.atan2(-look.X, -look.Z)
+	gyro.CFrame = CFrame.new(drag.Position)
+		* CFrame.Angles(0, yaw, 0)
+		* CFrame.Angles(WHEELIE_ANGLE, 0, 0)
+end)
+
+-- Keep this in the end
+Fluent:Notify({
+	Title = "Success",
+	Content = "Successfully loaded",
+	SubContent = "Script is now ready to use", -- Optional
+	Duration = 5 -- Set to nil to make the notification not disappear
+})
