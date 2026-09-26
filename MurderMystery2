@@ -188,12 +188,13 @@ end)
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
-local Camera = workspace.CurrentCamera
 
 local autoShootConnection = nil
 
 AutofarmTab.Create:Toggle("Auto Shoot if Sheriff", false, function(enabled)
 	if enabled then
+		if autoShootConnection then autoShootConnection:Disconnect() end
+
 		autoShootConnection = RunService.Heartbeat:Connect(function()
 			local character = LocalPlayer.Character
 			if not character then return end
@@ -201,7 +202,10 @@ AutofarmTab.Create:Toggle("Auto Shoot if Sheriff", false, function(enabled)
 			local humanoid = character:FindFirstChildOfClass("Humanoid")
 			if not humanoid or humanoid.Health <= 0 then return end
 
-			-- Etsi Gun backpackista tai characterista
+			local root = character:FindFirstChild("HumanoidRootPart")
+			if not root then return end
+
+			-- Etsi Gun backpackista tai hahmosta
 			local gun = LocalPlayer.Backpack:FindFirstChild("Gun") 
 				or character:FindFirstChild("Gun")
 
@@ -212,7 +216,7 @@ AutofarmTab.Create:Toggle("Auto Shoot if Sheriff", false, function(enabled)
 				humanoid:EquipTool(gun)
 			end
 
-			-- Etsi pelaaja jolla on Knife
+			-- Etsi pelaaja jolla on Knife (Murderer)
 			local targetPlayer = nil
 			local targetRoot = nil
 			local targetTorso = nil
@@ -234,22 +238,31 @@ AutofarmTab.Create:Toggle("Auto Shoot if Sheriff", false, function(enabled)
 
 			if not targetRoot or not targetTorso then return end
 
-			-- Loop-teleporttaa itsesi muutama stud yläpuolelle (ettei tipu)
-			local root = character:FindFirstChild("HumanoidRootPart")
-			if root then
-				root.CFrame = CFrame.new(targetRoot.Position + Vector3.new(0, 6, 0))
+			-- Teleportataan oma hahmo 20 studin päähän kohteen taakse
+			local targetLookDirection = targetRoot.CFrame.LookVector
+			local behindPosition = targetRoot.Position - (targetLookDirection * 20) + Vector3.new(0, 0.5, 0)
+			root.CFrame = CFrame.lookAt(behindPosition, targetTorso.Position)
+
+			-- ETSITÄÄN REMOTE EVENT
+			local shootRemote = gun:FindFirstChild("Shoot")
+			if shootRemote and shootRemote:IsA("RemoteEvent") then
+				-- Vastaus kysymykseesi: Lähtöpiste EI tarvitse olla aseessa!
+				-- Asetetaan luoti alkamaan 2 studiyksikköä kohteen takaa ja päättymään 2 studiyksikköä kohteen eteen.
+				-- Tämä saa luodin kulkemaan suoraan kohteen läpi seinistä ja esteistä välittämättä.
+				
+				local direction = targetLookDirection -- Käytetään kohteen omaa suuntaa lävistykseen
+				local targetStart = targetTorso.Position - (direction * 2)
+				local targetEnd = targetTorso.Position + (direction * 2)
+
+				local lookCFrame = CFrame.lookAt(targetStart, targetEnd)
+				local hitCFrame  = CFrame.new(targetEnd)
+
+				-- Lähetetään käsky suoraan palvelimelle ohittaen hiiren ja kameran
+				shootRemote:FireServer(lookCFrame, hitCFrame)
+			else
+				-- Vaihtoehtoinen varmistus, jos peli käyttää perinteistä aseen aktivointia
+				gun:Activate()
 			end
-
-			-- Aseta kamera targetin torson sisään / päälle
-			Camera.CFrame = CFrame.new(targetTorso.Position + Vector3.new(0, 1.5, 0), targetTorso.Position)
-
-			-- Ammu (Activate + VirtualUser click varmuuden vuoksi)
-			gun:Activate()
-
-			-- Joissain peissä tarvitaan myös hiiren klikkaus
-			local VirtualUser = game:GetService("VirtualUser")
-			VirtualUser:CaptureController()
-			VirtualUser:ClickButton1(Vector2.new())
 		end)
 	else
 		if autoShootConnection then
@@ -258,6 +271,7 @@ AutofarmTab.Create:Toggle("Auto Shoot if Sheriff", false, function(enabled)
 		end
 	end
 end)
+
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -574,6 +588,138 @@ ManualTab.Create:Button("Teleport to Game", function()
 end)
 
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local Player = Players.LocalPlayer
+local DodgeEnabled = false
+local DodgeConnection = nil
+
+local function GetCharacter()
+    return Player.Character
+end
+
+local function GetRoot()
+    local Character = GetCharacter()
+    if not Character then
+        return nil
+    end
+
+    return Character:FindFirstChild("HumanoidRootPart")
+end
+
+local function FindKnifeVisual()
+    -- Skannaa KOKO Workspacen, myös ThrowingKnife-modelien sisältä
+    for _, Object in ipairs(workspace:GetDescendants()) do
+        if Object.Name == "KnifeVisual" then
+
+            -- KnifeVisual voi olla BasePart
+            if Object:IsA("BasePart") then
+                return Object
+            end
+
+            -- Tai Model
+            if Object:IsA("Model") then
+                local Part = Object.PrimaryPart
+                    or Object:FindFirstChildWhichIsA("BasePart", true)
+
+                if Part then
+                    return Part
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
+local function Dodge()
+    if not DodgeEnabled then
+        return
+    end
+
+    local Character = GetCharacter()
+    local Root = GetRoot()
+
+    if not Character or not Root then
+        return
+    end
+
+    local Humanoid = Character:FindFirstChildOfClass("Humanoid")
+
+    if not Humanoid or Humanoid.Health <= 0 then
+        return
+    end
+
+    -- Etsitään KnifeVisual joka tickillä
+    local KnifeVisual = FindKnifeVisual()
+
+    if not KnifeVisual or not KnifeVisual.Parent then
+        return
+    end
+
+    -- 20 studin tarkistus
+    local Distance = (Root.Position - KnifeVisual.Position).Magnitude
+
+    if Distance > 20 then
+        return
+    end
+
+    -- Haetaan Parts uudelleen joka kerta
+    local Parts = workspace:FindFirstChild("RegularLobby")
+
+    if not Parts then
+        return
+    end
+
+    Parts = Parts:FindFirstChild("MainLobby")
+
+    if not Parts then
+        return
+    end
+
+    Parts = Parts:FindFirstChild("Parts")
+
+    if not Parts then
+        return
+    end
+
+    local Children = Parts:GetChildren()
+    local Target = Children[175]
+
+    if not Target or not Target:IsA("BasePart") then
+        return
+    end
+
+    -- Live CFrame juuri sillä hetkellä
+    Root.CFrame = Target.CFrame
+end
+
+local function StartDodge()
+    if DodgeConnection then
+        DodgeConnection:Disconnect()
+    end
+
+    DodgeConnection = RunService.Heartbeat:Connect(function()
+        if DodgeEnabled then
+            Dodge()
+        end
+    end)
+end
+
+ManualTab.Create:Toggle("Teleport Dodge", false, function(State)
+    DodgeEnabled = State
+
+    if DodgeConnection then
+        DodgeConnection:Disconnect()
+        DodgeConnection = nil
+    end
+
+    if DodgeEnabled then
+        StartDodge()
+    end
+end)
+
+local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
 local reachEnabled = false
@@ -788,8 +934,6 @@ local function getClosestKnifePlayer()
 	return closest
 end
 
-
--- Aimbot section starts here
 local function hasLineOfSight(origin, targetPos, targetCharacter)
 	local direction = targetPos - origin
 	local params = RaycastParams.new()
@@ -824,33 +968,40 @@ local function silentShoot()
 		or target.Character:FindFirstChild("HumanoidRootPart")
 	if not torso then return end
 
-	local myOrigin = workspace.CurrentCamera.CFrame.Position
+	local myCharacter = LocalPlayer.Character
+	local myHRP = myCharacter and myCharacter:FindFirstChild("HumanoidRootPart")
+	if not myHRP then return end
 
-	-- Tarkista suora näkymä
+	-- Tarkistetaan suora näköyhteys omasta hahmosta kohteeseen (esteet tiellä?)
+	local myOrigin = myHRP.Position
 	if not hasLineOfSight(myOrigin, torso.Position, target.Character) then
 		return
 	end
 
-	-- Suunta meiltä kohteeseen
+	-- MUUTOS: Luoti ammutaan nyt alkamaan suoraan kohteen sisältä!
+	-- Otetaan suunta sinusta kohteeseen
 	local direction = (torso.Position - myOrigin).Unit
 
-	-- Lähtöpiste: 5 studsia torson taakse
-	local startPos = torso.Position + direction * 5
+	-- Luoti alkaa 2 studiyksikköä kohteen takaa (suhteesi sinuun) ja menee 2 studiyksikköä kohteen läpi
+	local targetStart = torso.Position - (direction * 2)
+	local targetEnd = torso.Position + (direction * 2)
 
-	-- Ampumispiste: 2 studsia torson eteen (lävistää)
-	local endPos = torso.Position - direction * 2
+	local lookCFrame = CFrame.lookAt(targetStart, targetEnd)
+	local hitCFrame  = CFrame.new(targetEnd)
 
-	local lookCFrame = CFrame.new(startPos)
-	local hitCFrame  = CFrame.new(endPos)
-
+	-- Lähetetään täydellinen osuma suoraan palvelimelle ilman hiiren kursorin vaikutusta
 	shootRemote:FireServer(lookCFrame, hitCFrame)
 	lastShot = now
 end
 
-ManualTab.Create:Toggle("Aimbot (Retoggle every round)", false, function(enabled)
+ManualTab.Create:Toggle("Aimbot", false, function(enabled)
 	aimbotEnabled = enabled
 
 	if enabled then
+		if aimbotConnection then
+			aimbotConnection:Disconnect()
+		end
+		
 		aimbotConnection = RunService.Heartbeat:Connect(function()
 			if not aimbotEnabled then return end
 			if getGun() then
@@ -864,6 +1015,8 @@ ManualTab.Create:Toggle("Aimbot (Retoggle every round)", false, function(enabled
 		end
 	end
 end)
+
+
 
 local PlayerTab = Window.Create:Tab("Player")
 
